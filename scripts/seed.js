@@ -77,7 +77,7 @@ const pool = new Pool({
 
 const admins = [
   { email: 'shantanu.chaturvedi@nstarxinc.com', name: 'Shantanu', password: process.env.ADMIN_SHANTANU_PASSWORD },
-  { email: 'shantanu@kamkazi.com', name: 'Sujay', password: process.env.ADMIN_SUJAY_PASSWORD },
+  { email: 'sujay@nstarxinc.com', name: 'Sujay', password: process.env.ADMIN_SUJAY_PASSWORD },
 ];
 
 async function main() {

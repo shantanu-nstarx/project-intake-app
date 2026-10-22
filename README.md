@@ -41,7 +41,7 @@ Prerequisites on the Linux host:
 - Docker and Docker Compose installed
 - PostgreSQL reachable on `127.0.0.1:5434/nstarx_intake`
 - The uploads directory exists and is writable by uid 1000:
-  `/mnt/hikvision/Shantanu/Work/NStarX-Intake-Uploads`
+  `/var/lib/nstarx-intake/uploads` (set `UPLOAD_DIR` in `.env` to match this path)
 
 ### 1. Configure secrets
 
@@ -73,16 +73,14 @@ Ports used:
 
 ### 3. Add the DNS record
 
-Shantanu creates a Cloudflare DNS `A` record for `nstarx-intake.kamkazi.com`
-pointing to this host's public IP.
+Shantanu creates a DNS `A` record for your public domain (e.g., `intake.nstarxinc.com`) pointing to this host's public IP.
 
 ### 4. Route Cloudflare to the origin
 
-Create or update a Cloudflare tunnel so that `https://nstarx-intake.kamkazi.com`
-proxies to the Caddy HTTPS listener on this host:
+Create or update a Cloudflare tunnel so that your public domain proxies to the Caddy HTTPS listener on this host:
 
 ```
-https://nstarx-intake.kamkazi.com  ->  https://<host-ip>:8444
+https://intake.nstarxinc.com  ->  https://<host-ip>:8444
 ```
 
 Caddy presents an internal (self-signed) certificate. If Cloudflare TLS mode is
@@ -92,9 +90,9 @@ pulls.
 
 ### 5. Verify
 
-- Public intake: https://nstarx-intake.kamkazi.com/
-- Admin login: https://nstarx-intake.kamkazi.com/login
-- Dashboard: https://nstarx-intake.kamkazi.com/dashboard
+- Public intake: https://your-domain.com/
+- Admin login: https://your-domain.com/login
+- Dashboard: https://your-domain.com/dashboard
 
 Run the verification scripts after deploy:
 
@@ -111,8 +109,8 @@ node scripts/test-deployed-intake.js
 Local HTTPS smoke test (accepts Caddy's internal certificate):
 
 ```bash
-printf 'GET /login HTTP/1.1\r\nHost: nstarx-intake.kamkazi.com\r\nConnection: close\r\n\r\n' \
-  | openssl s_client -connect 127.0.0.1:8444 -servername nstarx-intake.kamkazi.com -quiet 2>/dev/null \
+printf 'GET /login HTTP/1.1\r\nHost: your-domain.com\r\nConnection: close\r\n\r\n' \
+  | openssl s_client -connect 127.0.0.1:8444 -servername your-domain.com -quiet 2>/dev/null \
   | head -1
 # should print: HTTP/1.1 200 OK
 ```
@@ -130,31 +128,34 @@ The app sends four kinds of email through SendGrid (`lib/email.ts`):
 
 Configuration (`.env`):
 
-- `SENDGRID_API_KEY` — required. If it is empty the app logs
-  `[email] EMAIL DISABLED — SENDGRID_API_KEY is empty ...` and sends nothing.
-  This was the original cause of "no emails arriving".
-- `SENDGRID_FROM_EMAIL` — sender address (default
-  `noreply@nstarx-intake.kamkazi.com`). It must be a SendGrid-verified sender or
-  on an authenticated sending domain for reliable inbox placement.
-- `EMAIL_REDIRECT_TO` — optional dev/test safety switch. When set, every
-  outbound message goes to that single address and the intended recipients are
-  recorded in the subject and body. Leave it **empty** in production so
-  submitters receive their own confirmations.
-- `ADMIN_NOTIFY_EMAILS` — comma-separated admin recipients. Test/dev
-  deployments must only list the placeholder recipient `shantanu@kamkazi.com`.
-- `ASSIGNEE_SHANTANU_EMAIL` / `ASSIGNEE_SUJAY_EMAIL` — assignee notification
-  addresses; keep both on the placeholder recipient for test/dev.
+- `SENDGRID_API_KEY` — **required for production**. Get this from your NStarX SendGrid account. The key needs Mail Send permissions. If empty, the app logs `[email] EMAIL DISABLED — SENDGRID_API_KEY is empty ...` and sends nothing.
+- `SENDGRID_FROM_EMAIL` — sender address (e.g., `noreply@nstarxinc.com`). **Must be a SendGrid-verified sender or on an authenticated sending domain.** Otherwise emails will bounce or land in spam.
+- `EMAIL_REDIRECT_TO` — optional dev/test safety switch. When set, every outbound message goes to that single address. Leave it **empty** in production so submitters receive their own confirmations.
+- `ADMIN_NOTIFY_EMAILS` — comma-separated admin recipients for new-submission and comment notifications. In production, set to real NStarX addresses.
+- `ASSIGNEE_SHANTANU_EMAIL` / `ASSIGNEE_SUJAY_EMAIL` — assignee notification addresses.
 
-Every send logs its outcome to stdout (`docker logs nstarx-intake-app`):
-`[email] admin notification for <ref> accepted by SendGrid for <to> (message-id=...)`
-on success and the SendGrid status/body on failure.
+### What Amol needs to do for emails to work:
 
-Verify delivery:
+1. Get a SendGrid API key from the NStarX SendGrid account
+2. Set `SENDGRID_API_KEY` in `.env`
+3. Verify the sender domain in SendGrid (the domain of `SENDGRID_FROM_EMAIL`)
+4. Set admin notification emails to real NStarX addresses:
 
-```bash
-node scripts/test-email.js             # template + service unit tests (no network)
-node scripts/test-email-delivery.js    # live send through the app's mail module
 ```
+ADMIN_NOTIFY_EMAILS=shantanu.chaturvedi@nstarxinc.com,sujay@nstarxinc.com
+ASSIGNEE_SHANTANU_EMAIL=shantanu.chaturvedi@nstarxinc.com
+ASSIGNEE_SUJAY_EMAIL=sujay@nstarxinc.com
+```
+
+5. Test email delivery after deploy: submit a test form and check if confirmation + admin notification emails arrive.
+
+### What if emails do not arrive?
+
+- Check `docker logs nstarx-intake-app` for SendGrid API errors
+- Verify the sender domain is authenticated in SendGrid dashboard
+- Use `EMAIL_REDIRECT_TO` temporarily to redirect all emails to a test address
+
+Every send logs its outcome to stdout — `[email] admin notification for <ref> accepted by SendGrid for <to> (message-id=...)` on success, and the SendGrid status/body on failure.
 
 ## Uploads
 
