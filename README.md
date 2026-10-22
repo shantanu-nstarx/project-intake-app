@@ -136,7 +136,7 @@ Configuration (`.env`):
 
 ### What Amol needs to do for emails to work:
 
-1. Get a SendGrid API key from the NStarX SendGrid account
+1. **Shantanu will provide the existing SendGrid API key.** No need to generate a new one — the same NStarX SendGrid account and API key will be used.
 2. Set `SENDGRID_API_KEY` in `.env`
 3. Verify the sender domain in SendGrid (the domain of `SENDGRID_FROM_EMAIL`)
 4. Set admin notification emails to real NStarX addresses:
